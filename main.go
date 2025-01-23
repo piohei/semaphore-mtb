@@ -330,6 +330,8 @@ func main() {
 					&cli.StringFlag{Name: "s3-region", Usage: "insertion/deletion", EnvVars: []string{"S3_REGION"}, DefaultText: "us-east1"},
 					&cli.StringFlag{Name: "s3-bucket", Usage: "insertion/deletion", EnvVars: []string{"S3_BUCKET"}, Required: true},
 					&cli.StringFlag{Name: "s3-object-key", Usage: "insertion/deletion", EnvVars: []string{"S3_OBJECT_KEY"}, Required: true},
+					&cli.IntFlag{Name: "s3-concurrency", Usage: "insertion/deletion", EnvVars: []string{"S3_CONCURRENCY"}, DefaultText: "8"},
+					&cli.Int64Flag{Name: "s3-part-mibs", Usage: "insertion/deletion", EnvVars: []string{"S3_PART_MIBS"}, DefaultText: "64"},
 				},
 				Action: func(context *cli.Context) error {
 					if context.Bool("json-logging") {
@@ -338,15 +340,26 @@ func main() {
 					region := context.String("s3-region")
 					bucket := context.String("s3-bucket")
 					objectKey := context.String("s3-object-key")
+					concurrency := context.Int("s3-concurrency")
+					partMibs := context.Int64("s3-part-mibs")
 					mode := context.String("mode")
 
 					if mode != server.DeletionMode && mode != server.InsertionMode {
 						return fmt.Errorf("invalid mode: %s", mode)
 					}
 
-					logging.Logger().Info().Msg("Loading proving system from file")
+					logging.Logger().
+						Info().
+						Str("region", region).
+						Str("bucket", bucket).
+						Str("objectKey", objectKey).
+						Str("objectKey", objectKey).
+						Int("concurrency", concurrency).
+						Int64("partMibs", partMibs).
+						Msg("Loading proving system from S3")
+
 					start := time.Now()
-					ps, err := prover.ReadSystemFromS3(region, bucket, objectKey)
+					ps, err := prover.ReadSystemFromS3(region, bucket, objectKey, concurrency, partMibs)
 					if err != nil {
 						return err
 					}

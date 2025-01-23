@@ -398,7 +398,7 @@ func ReadSystemFromFile(path string) (ps *ProvingSystem, err error) {
 	return
 }
 
-func ReadSystemFromS3(region, bucket, objectKey string) (ps *ProvingSystem, err error) {
+func ReadSystemFromS3(region, bucket, objectKey string, concurrency int, partMiBs int64) (ps *ProvingSystem, err error) {
 	ps = new(ProvingSystem)
 
 	ctx := context.TODO()
@@ -421,10 +421,9 @@ func ReadSystemFromS3(region, bucket, objectKey string) (ps *ProvingSystem, err 
 		return
 	}
 
-	var partMiBs int64 = 64
 	downloader := manager.NewDownloader(client, func(d *manager.Downloader) {
 		d.PartSize = partMiBs * 1024 * 1024
-		d.Concurrency = 8
+		d.Concurrency = concurrency
 	})
 
 	buff := make([]byte, *hObj.ContentLength)

@@ -401,7 +401,9 @@ func ReadSystemFromFile(path string) (ps *ProvingSystem, err error) {
 func ReadSystemFromS3(region, bucket, objectKey string) (ps *ProvingSystem, err error) {
 	ps = new(ProvingSystem)
 
-	awsConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	ctx := context.TODO()
+
+	awsConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
 		return
 	}
@@ -411,14 +413,7 @@ func ReadSystemFromS3(region, bucket, objectKey string) (ps *ProvingSystem, err 
 		return
 	}
 
-	var partMiBs int64 = 64
-	downloader := manager.NewDownloader(client, func(d *manager.Downloader) {
-		d.PartSize = partMiBs * 1024 * 1024
-		d.Concurrency = 10
-	})
-
-	buff := manager.NewWriteAtBuffer([]byte{})
-	_, err = downloader.Download(context.TODO(), buff, &s3.GetObjectInput{
+	hObj, err := client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(objectKey),
 	})
@@ -426,7 +421,23 @@ func ReadSystemFromS3(region, bucket, objectKey string) (ps *ProvingSystem, err 
 		return
 	}
 
-	bufferedReader := bytes.NewReader(buff.Bytes())
+	var partMiBs int64 = 64
+	downloader := manager.NewDownloader(client, func(d *manager.Downloader) {
+		d.PartSize = partMiBs * 1024 * 1024
+		d.Concurrency = 8
+	})
+
+	buff := make([]byte, *hObj.ContentLength)
+	w := manager.NewWriteAtBuffer(buff)
+	_, err = downloader.Download(context.TODO(), w, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		return
+	}
+
+	bufferedReader := bytes.NewReader(w.Bytes())
 	_, err = ps.UnsafeReadFrom(bufferedReader)
 	if err != nil {
 		return
